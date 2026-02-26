@@ -10,8 +10,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetch("/activities");
       const activities = await response.json();
 
-      // Clear loading message
+      // Clear loading message and reset dropdown
       activitiesList.innerHTML = "";
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -25,6 +26,10 @@ document.addEventListener("DOMContentLoaded", () => {
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <p><strong>Participants:</strong></p>
+          <ul class="participants-list">
+            ${details.participants.map(p => `<li>${p} <span class="delete-participant" data-activity="${name}" data-email="${p}">&times;</span></li>`).join('')}
+          </ul>
         `;
 
         activitiesList.appendChild(activityCard);
@@ -35,6 +40,8 @@ document.addEventListener("DOMContentLoaded", () => {
         option.textContent = name;
         activitySelect.appendChild(option);
       });
+      // after building all cards, bind delete icons
+      bindDeleteButtons();
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
       console.error("Error fetching activities:", error);
@@ -62,6 +69,8 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        // refresh activities view so new participant appears immediately
+        fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
@@ -80,6 +89,39 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Error signing up:", error);
     }
   });
+
+  // helper to bind delete icons
+  function bindDeleteButtons() {
+    document.querySelectorAll('.delete-participant').forEach(el => {
+      el.addEventListener('click', async () => {
+        const activity = el.getAttribute('data-activity');
+        const email = el.getAttribute('data-email');
+        try {
+          const resp = await fetch(
+            `/activities/${encodeURIComponent(activity)}/signup?email=${encodeURIComponent(email)}`,
+            { method: 'DELETE' }
+          );
+          const resJson = await resp.json();
+          if (resp.ok) {
+            messageDiv.textContent = resJson.message;
+            messageDiv.className = 'success';
+            fetchActivities();
+          } else {
+            messageDiv.textContent = resJson.detail || 'An error occurred';
+            messageDiv.className = 'error';
+          }
+        } catch (err) {
+          messageDiv.textContent = 'Failed to unregister. Please try again.';
+          messageDiv.className = 'error';
+          console.error('Error unregistering:', err);
+        }
+        messageDiv.classList.remove('hidden');
+        setTimeout(() => {
+          messageDiv.classList.add('hidden');
+        }, 5000);
+      });
+    });
+  }
 
   // Initialize app
   fetchActivities();
